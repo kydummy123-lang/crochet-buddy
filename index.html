@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f7e7df">
+<meta name="description" content="Crochet Buddy — your beginner-friendly crochet pattern journal.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+<title>🧶 Crochet Buddy</title>
+</head>
+<body>
+<header class="topbar">
+  <div><p class="eyebrow">MY CROCHET JOURNAL</p><h1>🧶 Crochet Buddy</h1></div>
+  <div class="top-actions"><button class="icon-btn" id="profileBtn" title="Your Profile & Account" onclick="openProfile()">👤</button><button class="icon-btn" id="tipBtn">✨</button><button class="icon-btn" id="lockBtn" title="Lock app">🔒</button></div>
+</header>
+
+<main>
+<section id="home" class="screen active">
+  <div class="hero card"><div><span class="pill">Beginner friendly</span><h2>Good day, crocheter! 🌸</h2><p>Save patterns, record every round, attach tutorial photos, and keep your crochet journey organized.</p></div><div class="yarn-art">🧶</div></div>
+  <div class="section-title"><h3>Continue a project</h3><button class="text-btn" data-go="projects">See all</button></div>
+  <div id="homeProjects" class="stack"></div>
+  <div class="tip card"><div class="tip-icon">✨</div><div><strong>Beginner Tip</strong><p id="tipText">Count your stitches at the end of every round.</p></div></div>
+</section>
+
+<section id="learn" class="screen">
+  <div class="page-heading"><span class="pill">START HERE</span><h2>Learn Crochet 📚</h2><p>Learn step by step, mark lessons you’ve learned, and keep your own crochet discoveries here.</p></div>
+  <div id="lessonList" class="lesson-grid"></div>
+</section>
+
+<section id="patterns" class="screen">
+  <div class="page-heading"><span class="pill">YOUR PATTERN NOTEBOOK</span><h2>My Patterns 🧶</h2><p>Save patterns from tutorials, write your own rounds, and attach photos.</p></div>
+  <div class="pattern-tools">
+    <select id="categoryFilter" class="search"><option value="All">All Categories</option></select>
+    <button class="primary-btn" id="addPatternBtn">＋ New Pattern</button>
+  </div>
+  <div id="patternList" class="stack"></div>
+</section>
+
+<section id="projects" class="screen">
+  <div class="page-heading"><span class="pill">MAKE & TRACK</span><h2>My Projects 📋</h2><p>Keep track of your WIPs and finished creations.</p></div>
+  <button class="primary-btn full" id="addProjectBtn">＋ Add Project</button>
+  <div id="projectList" class="stack"></div>
+</section>
+
+<section id="yarn" class="screen">
+  <div class="page-heading"><span class="pill">YOUR STASH</span><h2>Yarn Stash 🧵</h2><p>Remember what yarn you already have.</p></div>
+  <button class="primary-btn full" id="addYarnBtn">＋ Add Yarn</button>
+  <div id="yarnList" class="stack"></div>
+</section>
+
+<section id="dictionary" class="screen">
+  <div class="page-heading"><span class="pill">QUICK REFERENCE</span><h2>Stitch Dictionary 🪝</h2><p>Simple explanations for common crochet terms.</p></div>
+  <input id="stitchSearch" class="search" placeholder="Search stitch or abbreviation...">
+  <div id="stitchList" class="stack"></div>
+</section>
+</main>
+
+<nav class="bottom-nav">
+<button class="nav-item active" data-go="home"><span>🏠</span>Home</button>
+<button class="nav-item" data-go="learn"><span>📚</span>Learn</button>
+<button class="nav-item" data-go="patterns"><span>🧶</span>Patterns</button>
+<button class="nav-item" data-go="projects"><span>📋</span>Projects</button>
+<button class="nav-item" data-go="yarn"><span>🧵</span>Yarn</button>
+</nav>
+
+<div id="syncStatus" class="sync-status">☁️ Local</div>
+<div id="toast" class="toast"></div>
+<div id="modal" class="modal hidden"><div class="modal-card"><button class="close-btn" id="closeModal">×</button><div id="modalContent"></div></div></div>
+
+
+<div id="authScreen" class="auth-screen hidden">
+  <div class="auth-card">
+    <div class="lock-icon">🧶</div>
+    <span class="pill">CROCHET BUDDY CLOUD</span>
+    <h2 id="authTitle">Welcome back 💗</h2>
+    <p id="authSubtitle">Log in to keep your crochet journal synced across your devices.</p>
+    <label>Email</label><input id="authEmail" class="form-input" type="email" autocomplete="email" placeholder="you@example.com">
+    <label>Password</label><input id="authPassword" class="form-input" type="password" autocomplete="current-password" placeholder="Your password">
+    <button id="authSubmit" class="primary-btn full">Log In</button>
+    <button id="authForgot" class="text-btn">Forgot password?</button>
+    <button id="authSwitch" class="text-btn">Create a new account</button>
+    <div id="authMessage" class="pin-message"></div>
+    <small class="auth-note">Your Crochet Buddy data is stored in your cloud account when sync is connected.</small>
+  </div>
+</div>
+
+<div id="lockScreen" class="lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon">🧶</div>
+    <span class="pill">PRIVATE JOURNAL</span>
+    <h2>Welcome to Crochet Buddy</h2>
+    <p id="pinPrompt">Enter your 4-digit PIN to open your crochet notebook.</p>
+    <div class="pin-dots" id="pinDots"><span></span><span></span><span></span><span></span></div>
+    <input id="pinInput" class="pin-input" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" aria-label="4 digit PIN">
+    <div class="keypad" aria-label="PIN keypad">
+      <button class="key" data-key="1">1</button><button class="key" data-key="2">2</button><button class="key" data-key="3">3</button>
+      <button class="key" data-key="4">4</button><button class="key" data-key="5">5</button><button class="key" data-key="6">6</button>
+      <button class="key" data-key="7">7</button><button class="key" data-key="8">8</button><button class="key" data-key="9">9</button>
+      <button class="key secondary" data-key="clear">⌫</button><button class="key" data-key="0">0</button><button class="key confirm" data-key="enter">✓</button>
+    </div>
+    <div id="pinMessage" class="pin-message"></div>
+    <button class="text-btn" id="changePinBtn">Change PIN</button>
+    <div class="account-lock-row"><span id="lockAccountText">☁️ Cloud account</span><button class="text-btn danger-text" id="lockLogoutBtn">Log out / Switch account</button></div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="script.js?v=16"></script>
+</body>
+</html>

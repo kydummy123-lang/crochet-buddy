@@ -1,0 +1,22 @@
+CROCHET BUDDY v13 — CLOUD SYNC SETUP
+
+1. In Supabase, open Crochet Buddy > SQL Editor.
+2. Create a new query.
+3. Open supabase_schema.sql from this folder.
+4. Copy all of its contents into the SQL Editor.
+5. Click Run.
+6. You should see that the user_data table was created.
+7. Then open index.html from this package to test Crochet Buddy.
+
+The app is configured with the Supabase project URL and publishable key provided for the Crochet Buddy project.
+
+IMPORTANT:
+- The publishable key is intended for browser use.
+- Never put a Supabase secret/service-role key into the website.
+- Email confirmation is enabled in Supabase. After signing up, check your email and confirm it before logging in.
+
+Cloud behavior:
+- Each Supabase account gets its own cloud data.
+- All local profiles inside that account sync together.
+- Patterns, rounds, projects, progress, yarn, learning notes, themes, and profile settings are included.
+- The current implementation stores images inside the synced JSON data. A later improvement can move images to Supabase Storage for better scalability.
