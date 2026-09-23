@@ -10,49 +10,126 @@ function removeRoundImage(i){
 const KEY="crochetBuddyV2";
 const PROFILE_KEY="crochetBuddyProfilesV1";
 const defaultCategories=["Amigurumi","Bags","Wearables","Home Decor","Flowers","Accessories","Toys","Blankets","Other"];
-// ☁️ Crochet Buddy cloud connection
+// ☁️ Crochet Buddy cloud connection + image storage
 const SUPABASE_URL = "https://fchlwbdazyupkkcjvmkp.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_6nexdusB9XeANQad4FTnww_qibUOe1c";
+const IMAGE_BUCKET = "crochet-images";
 const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 let cloudUser = null;
 let cloudReady = false;
 let cloudSaveTimer = null;
+const pendingImages = {};
 function setSyncStatus(text, state="") { const el=document.getElementById("syncStatus"); if(el){el.textContent=text;el.dataset.state=state;} }
 function setAuthMessage(text, ok=false){ const el=document.getElementById("authMessage"); if(el){el.textContent=text;el.classList.toggle("ok",ok);} }
 function showAuthScreen(show=true){ document.getElementById("authScreen")?.classList.toggle("hidden",!show); if(show) document.getElementById("lockScreen")?.classList.add("hidden"); }
 function localSnapshot(){ return {activeId:profileStore.activeId, profiles:profileStore.profiles}; }
+function isDataImage(value){return typeof value==="string" && value.startsWith("data:image/");}
+function fileToDataUrl(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});}
+async function optimizeImage(file){
+  if(!file)return null;
+  try{
+    const dataUrl=await fileToDataUrl(file);
+    const img=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=dataUrl;});
+    const max=1600, scale=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+    const w=Math.max(1,Math.round((img.naturalWidth||img.width)*scale)), h=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+    const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,w,h);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.8));
+    return blob||file;
+  }catch(e){console.warn("Image optimization skipped",e);return file;}
+}
+async function uploadImageFile(file, kind="image"){
+  if(!supabaseClient||!cloudUser||!file)return null;
+  const blob=await optimizeImage(file);
+  const safeKind=String(kind).replace(/[^a-z0-9_-]/gi,"-").toLowerCase();
+  const path=`${cloudUser.id}/${safeKind}/${Date.now()}-${Math.random().toString(36).slice(2,9)}.jpg`;
+  const {error}=await supabaseClient.storage.from(IMAGE_BUCKET).upload(path,blob,{contentType:"image/jpeg",upsert:false,cacheControl:"31536000"});
+  if(error){console.error(error);throw error;}
+  const {data}=supabaseClient.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+async function migrateDataImages(){
+  if(!cloudUser)return false;
+  let changed=false;
+  const uploadIfNeeded=async(value,kind)=>{
+    if(!isDataImage(value))return value;
+    try{
+      const res=await fetch(value);const blob=await res.blob();
+      return await uploadImageFile(blob,kind);
+    }catch(e){console.error("Image migration failed",e);throw e;}
+  };
+  for(const [pid,profile] of Object.entries(profileStore.profiles||{})){
+    const d=normalizeData(profile.data);
+    for(const ptn of d.patterns){
+      if(isDataImage(ptn.cover)){ptn.cover=await uploadIfNeeded(ptn.cover,"pattern-cover");changed=true;}
+      for(let i=0;i<(ptn.rounds||[]).length;i++){
+        const r=ptn.rounds[i];
+        const old=r.image||r.img||"";
+        if(isDataImage(old)){r.image=await uploadIfNeeded(old,"round");delete r.img;changed=true;}
+      }
+    }
+    for(const l of (d.myLearnings||[])){
+      if(isDataImage(l.image)){l.image=await uploadIfNeeded(l.image,"learning");changed=true;}
+    }
+    profile.data=d;
+  }
+  if(changed){
+    data=normalizeData(profileStore.profiles[activeProfileId].data);
+    profileStore.activeId=activeProfileId;
+  }
+  return changed;
+}
+async function saveLocalSafe(){
+  profileStore.activeId=activeProfileId;
+  profileStore.profiles[activeProfileId].data=data;
+  localStorage.setItem(PROFILE_KEY,JSON.stringify(profileStore));
+}
 async function loadCloudData(user){
   if(!supabaseClient || !user) return false;
   setSyncStatus("☁️ Loading…","loading");
   const {data:row,error}=await supabaseClient.from("user_data").select("data").eq("user_id",user.id).maybeSingle();
   if(error){ console.error(error); setSyncStatus("☁️ Sync error","error"); toast("Cloud data could not be loaded. Check the setup."); return false; }
-  if(row?.data?.profiles){
-    profileStore=row.data;
-    activeProfileId=profileStore.activeId||Object.keys(profileStore.profiles)[0];
-    if(!profileStore.profiles[activeProfileId]) activeProfileId=Object.keys(profileStore.profiles)[0];
-    data=normalizeData(profileStore.profiles[activeProfileId].data);
-    localStorage.setItem(PROFILE_KEY,JSON.stringify(profileStore));
-  } else {
-    // First login: upload the existing local journal so nothing is lost.
-    const payload=localSnapshot();
-    const {error:upErr}=await supabaseClient.from("user_data").upsert({user_id:user.id,data:payload,updated_at:new Date().toISOString()});
-    if(upErr){console.error(upErr);setSyncStatus("☁️ Sync error","error");toast("Could not upload your existing journal.");return false;}
+  try{
+    if(row?.data?.profiles){
+      profileStore=row.data;
+      activeProfileId=profileStore.activeId||Object.keys(profileStore.profiles)[0];
+      if(!profileStore.profiles[activeProfileId]) activeProfileId=Object.keys(profileStore.profiles)[0];
+      data=normalizeData(profileStore.profiles[activeProfileId].data);
+    } else {
+      // First login: use the existing local journal, but move old embedded images to cloud storage first.
+      profileStore.activeId=activeProfileId;
+      await migrateDataImages();
+      const payload=localSnapshot();
+      const {error:upErr}=await supabaseClient.from("user_data").upsert({user_id:user.id,data:payload,updated_at:new Date().toISOString()});
+      if(upErr)throw upErr;
+    }
+    // Existing cloud data from v16 may contain embedded base64 images. Move those out of JSON.
+    const migrated=await migrateDataImages();
+    if(migrated){
+      const {error:upErr}=await supabaseClient.from("user_data").upsert({user_id:user.id,data:localSnapshot(),updated_at:new Date().toISOString()});
+      if(upErr)throw upErr;
+    }
+    await saveLocalSafe();
+  }catch(err){
+    console.error(err);setSyncStatus("☁️ Storage setup needed","error");toast("Your journal is safe for now, but image storage needs to be set up in Supabase.");return false;
   }
   cloudReady=true;
   applyTheme(); renderAll();
   setSyncStatus("☁️ Synced","ok");
   return true;
 }
+async function cloudSaveNow(){
+  if(!cloudReady || !cloudUser || !supabaseClient) return;
+  const payload=localSnapshot();
+  const {error}=await supabaseClient.from("user_data").upsert({user_id:cloudUser.id,data:payload,updated_at:new Date().toISOString()});
+  if(error){console.error(error);setSyncStatus("☁️ Sync error","error");toast("Saved on this device, but cloud sync failed.");}
+  else setSyncStatus("☁️ Synced","ok");
+}
 async function cloudSave(){
   if(!cloudReady || !cloudUser || !supabaseClient) return;
   clearTimeout(cloudSaveTimer);
   setSyncStatus("☁️ Saving…","saving");
-  cloudSaveTimer=setTimeout(async()=>{
-    const payload=localSnapshot();
-    const {error}=await supabaseClient.from("user_data").upsert({user_id:cloudUser.id,data:payload,updated_at:new Date().toISOString()});
-    if(error){console.error(error);setSyncStatus("☁️ Sync error","error");toast("Saved on this device, but cloud sync failed.");}
-    else setSyncStatus("☁️ Synced","ok");
-  },400);
+  cloudSaveTimer=setTimeout(cloudSaveNow,400);
 }
 async function logoutCloud(){
   if(supabaseClient) await supabaseClient.auth.signOut();
@@ -61,6 +138,7 @@ async function logoutCloud(){
   setSyncStatus("☁️ Signed out");
   showAuthScreen(true);
 }
+
 const tips=["Count your stitches at the end of every round.","Keep scrap yarn nearby for testing tension.","Frogging is part of learning! 🐸","Mark the first stitch of every round.","Write down changes you make so you can repeat them later."];
 const lessons=[["01","Slip Knot","Learn the starting loop used for most crochet projects.","🪢"],["02","Chain Stitch (ch)","Make a foundation chain and practice even tension.","〰️"],["03","Single Crochet (sc)","Your first basic stitch and a building block for many projects.","🧶"],["04","Half Double Crochet (hdc)","A taller stitch with a soft, flexible fabric.","🌷"],["05","Double Crochet (dc)","A taller stitch that works up quickly.","✨"],["06","Increase (inc)","Learn how to add stitches and shape your project.","📈"],["07","Decrease (dec)","Learn how to reduce stitches and shape your work.","📉"],["08","Reading Patterns","Understand abbreviations, repeats, rounds and stitch counts.","📖"]];
 const stitches=[["SC","Single Crochet","Insert hook, yarn over and pull up a loop. Yarn over and pull through both loops."],["HDC","Half Double Crochet","Yarn over, insert hook, yarn over and pull up a loop. Yarn over and pull through all three loops."],["DC","Double Crochet","Yarn over, insert hook, yarn over and pull up a loop. Yarn over, pull through two; yarn over, pull through two."],["CH","Chain","Yarn over and pull the yarn through the loop on your hook."],["SL ST","Slip Stitch","Insert hook, yarn over, and pull through the stitch and the loop on your hook."],["INC","Increase","Make two stitches into the same stitch."],["DEC","Decrease","Combine two stitches into one stitch."]];
@@ -229,11 +307,16 @@ function addMyLearning(){
     <img id="learnImageValuePreview" class="photo-preview" style="display:none">
     <div class="form-actions"><button class="mini-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" onclick="saveMyLearning()">Save Learning ✓</button></div>`);
 }
-function saveMyLearning(){
+async function saveMyLearning(){
   const title=document.getElementById("learnTitle")?.value.trim();
   if(!title){alert("Please enter what you learned.");return;}
   data.myLearnings=data.myLearnings||[];
-  data.myLearnings.unshift({title,category:document.getElementById("learnCategory").value,status:document.getElementById("learnStatus").value,notes:document.getElementById("learnNotes").value,image:document.getElementById("learnImageValue").value,date:new Date().toLocaleDateString()});
+  let image=document.getElementById("learnImageValue").value||"";
+  if(pendingImages.learnImageValue){
+    if(!cloudUser){alert("Please sign in to save photos to cloud storage.");return;}
+    try{setSyncStatus("☁️ Uploading photo…","saving");image=await uploadImageFile(pendingImages.learnImageValue,"learning");delete pendingImages.learnImageValue;}catch(e){alert("The photo could not be uploaded. Please try again.");return;}
+  }
+  data.myLearnings.unshift({title,category:document.getElementById("learnCategory").value,status:document.getElementById("learnStatus").value,notes:document.getElementById("learnNotes").value,image,date:new Date().toLocaleDateString()});
   if(saveData()){closeModal();renderLessons();toast("Learning saved ✓");}
 }
 function deleteMyLearning(i){if(confirm("Delete this learning note?")){data.myLearnings.splice(i,1);if(saveData())renderLessons();}}
@@ -242,12 +325,27 @@ function renderCategories(){const sel=document.getElementById("categoryFilter"),
 function renderAll(){renderCategories();renderProjects();renderPatterns();renderYarn();renderLessons();renderStitches(document.getElementById("stitchSearch")?.value||"")}
 function lesson(n){const l=lessons.find(x=>x[0]===n);modal(`<span class="pill">LESSON ${l[0]}</span><h2>${l[3]} ${esc(l[1])}</h2><p>${esc(l[2])}</p><div class="card" style="padding:16px;margin-top:14px"><strong>Practice</strong><p>Grab your hook and some scrap yarn. Practice slowly and count your stitches.</p></div><div class="form-actions"><button class="primary-btn" onclick="closeModal()">Got it ✓</button></div>`)}
 function removeItem(type,i){if(confirm("Delete this item?")){data[type].splice(i,1);save()}}
-function addImage(input,targetId){const f=input.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{document.getElementById(targetId).value=r.result;document.getElementById(targetId+"Preview").src=r.result;document.getElementById(targetId+"Preview").style.display="block"};r.readAsDataURL(f)}
+function addImage(input,targetId){
+  const f=input.files?.[0];if(!f)return;
+  pendingImages[targetId]=f;
+  const url=URL.createObjectURL(f);
+  const hidden=document.getElementById(targetId);if(hidden)hidden.value="";
+  const preview=document.getElementById(targetId+"Preview");
+  if(preview){preview.src=url;preview.style.display="block";preview.onload=()=>URL.revokeObjectURL(url);}
+}
 function categoryOptions(selected=""){return data.categories.map(c=>`<option ${c===selected?"selected":""}>${esc(c)}</option>`).join("")}
 document.getElementById("addPatternBtn").onclick=()=>newPattern();
 function newPattern(){modal(`<h2>New Pattern 🧶</h2><label>Pattern name</label><input id="pName" class="form-input" placeholder="e.g. Bunny Amigurumi"><label>Category</label><div class="source-row"><select id="pCat" class="form-input">${categoryOptions("Amigurumi")}</select><button class="mini-btn" onclick="addCategory()">＋ Category</button></div><label>Source / YouTube URL</label><input id="pSource" class="form-input" placeholder="Paste YouTube link"><label>Difficulty</label><input id="pDiff" class="form-input" placeholder="Beginner"><label>Hook</label><input id="pHook" class="form-input" placeholder="3.0 mm"><label>Yarn</label><input id="pYarn" class="form-input" placeholder="Cotton yarn"><label>Cover photo</label><input type="hidden" id="pCover"><input type="file" accept="image/*" class="form-input" onchange="addImage(this,'pCover')"><img id="pCoverPreview" class="photo-preview" style="display:none"><div class="form-actions"><button class="primary-btn" onclick="createPattern()">Create Pattern</button></div>`)}
 function addCategory(){const n=prompt("New category name:");if(n&&n.trim()&&!data.categories.includes(n.trim())){data.categories.push(n.trim());save();newPattern()}}
-function createPattern(){const p={id:Date.now().toString(),name:document.getElementById("pName").value||"Untitled Pattern",category:document.getElementById("pCat").value,source:document.getElementById("pSource").value,difficulty:document.getElementById("pDiff").value||"Beginner",hook:document.getElementById("pHook").value,yarn:document.getElementById("pYarn").value,cover:document.getElementById("pCover").value,notes:"",rounds:[]};data.patterns.unshift(p);save();closeModal();viewPattern(p.id)}
+async function createPattern(){
+  let cover=document.getElementById("pCover").value||"";
+  if(pendingImages.pCover){
+    if(!cloudUser){alert("Please sign in to save a cover photo to cloud storage.");return;}
+    try{setSyncStatus("☁️ Uploading cover photo…","saving");cover=await uploadImageFile(pendingImages.pCover,"pattern-cover");delete pendingImages.pCover;}catch(e){alert("The cover photo could not be uploaded. Please try again.");return;}
+  }
+  const p={id:Date.now().toString(),name:document.getElementById("pName").value||"Untitled Pattern",category:document.getElementById("pCat").value,source:document.getElementById("pSource").value,difficulty:document.getElementById("pDiff").value||"Beginner",hook:document.getElementById("pHook").value,yarn:document.getElementById("pYarn").value,cover,notes:"",rounds:[]};
+  data.patterns.unshift(p);save();closeModal();viewPattern(p.id)
+}
 function deletePattern(id){if(confirm("Delete this pattern and its rounds?")){data.patterns=data.patterns.filter(p=>p.id!==id);save()}}
 function viewPattern(id,projectId=null){const p=data.patterns.find(x=>x.id===id);if(!p)return;modal(patternEditor(p,projectId,false))}
 function editPattern(id){
@@ -325,17 +423,14 @@ function previewRoundImage(input){
   const card=input.closest(".round-card");
   const f=input.files?.[0];
   if(!f || !card)return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    const hidden=card.querySelector(".round-image-value");
-    if(hidden)hidden.value=reader.result;
-    let img=card.querySelector(".round-image-preview");
-    if(!img){img=document.createElement("img");img.className="round-image-preview";card.querySelector(".image-actions").before(img);}
-    img.src=reader.result;img.style.display="block";
-    const empty=card.querySelector(".round-no-image");if(empty)empty.style.display="none";
-    card.dataset.imageChanged="1";
-  };
-  reader.readAsDataURL(f);
+  card._pendingImageFile=f;
+  const url=URL.createObjectURL(f);
+  const hidden=card.querySelector(".round-image-value");if(hidden)hidden.value="";
+  let img=card.querySelector(".round-image-preview");
+  if(!img){img=document.createElement("img");img.className="round-image-preview";card.querySelector(".image-actions").before(img);}
+  img.src=url;img.style.display="block";img.onload=()=>URL.revokeObjectURL(url);
+  const empty=card.querySelector(".round-no-image");if(empty)empty.style.display="none";
+  card.dataset.imageChanged="1";
 }
 function collectRoundEditor(p){
   const cards=[...document.querySelectorAll("#rounds .round-card")];
@@ -346,9 +441,17 @@ function collectRoundEditor(p){
     image:c.querySelector(".round-image-value")?.value||""
   }));
 }
-function saveRounds(id){
+async function saveRounds(id){
   const p=data.patterns.find(x=>x.id===id);
   if(!p)return;
+  const cards=[...document.querySelectorAll("#rounds .round-card")];
+  for(let i=0;i<cards.length;i++){
+    const card=cards[i], file=card._pendingImageFile;
+    if(file){
+      if(!cloudUser){alert("Please sign in to save round photos to cloud storage.");return;}
+      try{setSyncStatus(`☁️ Uploading round ${i+1}…`,"saving");const url=await uploadImageFile(file,"round");const hidden=card.querySelector(".round-image-value");if(hidden)hidden.value=url;delete card._pendingImageFile;}catch(e){alert(`Round ${i+1} photo could not be uploaded. Please try again.`);return;}
+    }
+  }
   collectRoundEditor(p);
   syncLinkedProjectProgress(p);
   if(saveData()){

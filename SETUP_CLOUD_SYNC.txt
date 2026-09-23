@@ -1,22 +1,15 @@
-CROCHET BUDDY v13 — CLOUD SYNC SETUP
+CROCHET BUDDY v17 - CLOUD IMAGE STORAGE
 
-1. In Supabase, open Crochet Buddy > SQL Editor.
-2. Create a new query.
-3. Open supabase_schema.sql from this folder.
-4. Copy all of its contents into the SQL Editor.
-5. Click Run.
-6. You should see that the user_data table was created.
-7. Then open index.html from this package to test Crochet Buddy.
+Supabase setup:
+1. Open your Crochet Buddy project in Supabase.
+2. Go to SQL Editor.
+3. Run the entire contents of supabase_schema.sql once.
+4. This keeps the existing user_data table and adds the crochet-images Storage bucket.
+5. Do not use a service-role/secret key in the app.
 
-The app is configured with the Supabase project URL and publishable key provided for the Crochet Buddy project.
-
-IMPORTANT:
-- The publishable key is intended for browser use.
-- Never put a Supabase secret/service-role key into the website.
-- Email confirmation is enabled in Supabase. After signing up, check your email and confirm it before logging in.
-
-Cloud behavior:
-- Each Supabase account gets its own cloud data.
-- All local profiles inside that account sync together.
-- Patterns, rounds, projects, progress, yarn, learning notes, themes, and profile settings are included.
-- The current implementation stores images inside the synced JSON data. A later improvement can move images to Supabase Storage for better scalability.
+v17 image behavior:
+- Pattern cover photos, round screenshots, and Learn photos are uploaded to Supabase Storage.
+- The database stores small image URLs instead of huge Base64 images.
+- Existing v16 Base64 images are automatically moved to Storage after login.
+- Images are resized before upload to reduce phone data/storage use.
+- The same GitHub Pages URL continues to host the app.
