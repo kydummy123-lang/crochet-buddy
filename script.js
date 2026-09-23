@@ -264,7 +264,7 @@ function renderPatterns(){
     <div class="item-head"><div><span class="category-badge">${esc(p.category)}</span><h3 style="margin-top:8px">${esc(p.name)}</h3><div class="meta">${esc(p.difficulty||"Beginner")} · ${p.rounds?.length||0} rounds · ${esc(p.yarn||"Yarn not set")}</div></div></div>
     ${p.rounds?.length?`<div class="meta">Last completed: ${last>=0?`R${last+1}`:"None yet"}</div>`:""}
     ${linked?`<div class="linked-pattern">📋 ${linked} project${linked>1?"s":""} linked</div>`:""}
-    <div class="pattern-actions"><button class="mini-btn view-btn" onclick="viewPattern('${p.id}')">👁 View</button><button class="mini-btn edit-btn" onclick="editPattern('${p.id}')">✏️ Edit</button></div>
+    <div class="pattern-actions"><button class="mini-btn view-btn" onclick="viewPattern('${p.id}')">👁 View</button><button class="mini-btn edit-btn" onclick="editPattern('${p.id}')">✏️ Edit</button><button class="mini-btn danger" onclick="deletePattern('${p.id}')">🗑 Delete</button></div>
    </div>`
  }).join(""):'<div class="empty">No patterns in this category yet. Tap “New Pattern” to start. 🧶</div>'
 }
@@ -279,10 +279,11 @@ function renderLessons(){
     </div>`;
   }).join("");
   const mine=(data.myLearnings||[]).map((x,i)=>`<div class="item my-learning-card">
-    <div class="item-head"><div><span class="pill">MY LEARNING</span><h3 style="margin-top:8px">${esc(x.title)}</h3></div><button class="danger" onclick="deleteMyLearning(${i})">Delete</button></div>
+    <div class="item-head"><div><span class="pill">MY LEARNING</span><h3 style="margin-top:8px">${esc(x.title)}</h3></div><div class="item-actions"><button class="mini-btn edit-btn" onclick="editMyLearning(${i})">✏️ Edit</button><button class="danger" onclick="deleteMyLearning(${i})">Delete</button></div></div>
     <div class="meta">${esc(x.category||"Other")} · ${esc(x.status||"Learned")} · ${esc(x.date||"")}</div>
     ${x.notes?`<p class="learning-notes">${nl2br(esc(x.notes))}</p>`:""}
-    ${x.image?`<img class="learning-image" src="${x.image}" alt="${esc(x.title)}">`:""}
+    ${x.link?`<div class="learning-link"><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">🔗 Open Attached Link</a></div>`:""}
+    ${x.image?`<img class="learning-image" src="${esc(x.image)}" alt="${esc(x.title)}">`:""}
   </div>`).join("");
   document.getElementById("lessonList").innerHTML=`
     <div class="learn-toolbar"><div><h3>What I’ve Learned 🌱</h3><p>Add your own crochet discoveries, techniques, or notes.</p></div><button class="primary-btn" onclick="addMyLearning()">＋ Add Learning</button></div>
@@ -303,6 +304,7 @@ function addMyLearning(){
     <label>Category</label><select id="learnCategory" class="form-input"><option>Stitch</option><option>Technique</option><option>Pattern Reading</option><option>Yarn & Hook</option><option>Tip / Discovery</option><option>Other</option></select>
     <label>Status</label><select id="learnStatus" class="form-input"><option>Learned</option><option>Practicing</option><option>Need to Practice</option></select>
     <label>Notes</label><textarea id="learnNotes" class="form-textarea" placeholder="Write what you learned, steps, tips, or reminders..."></textarea>
+    <label>Attach link</label><input id="learnLink" type="url" class="form-input" placeholder="https://youtube.com/... or another reference link">
     <label>Optional photo / screenshot</label><input id="learnImage" type="file" accept="image/*" class="form-input" onchange="addImage(this,'learnImageValue')"><input id="learnImageValue" type="hidden">
     <img id="learnImageValuePreview" class="photo-preview" style="display:none">
     <div class="form-actions"><button class="mini-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" onclick="saveMyLearning()">Save Learning ✓</button></div>`);
@@ -316,10 +318,44 @@ async function saveMyLearning(){
     if(!cloudUser){alert("Please sign in to save photos to cloud storage.");return;}
     try{setSyncStatus("☁️ Uploading photo…","saving");image=await uploadImageFile(pendingImages.learnImageValue,"learning");delete pendingImages.learnImageValue;}catch(e){alert("The photo could not be uploaded. Please try again.");return;}
   }
-  data.myLearnings.unshift({title,category:document.getElementById("learnCategory").value,status:document.getElementById("learnStatus").value,notes:document.getElementById("learnNotes").value,image,date:new Date().toLocaleDateString()});
+  const link=document.getElementById("learnLink")?.value.trim()||"";
+  if(link){try{new URL(link);}catch(e){alert("Please enter a valid link starting with http:// or https://");return;}}
+  data.myLearnings.unshift({title,category:document.getElementById("learnCategory").value,status:document.getElementById("learnStatus").value,notes:document.getElementById("learnNotes").value,link,image,date:new Date().toLocaleDateString()});
   if(saveData()){closeModal();renderLessons();toast("Learning saved ✓");}
 }
 function deleteMyLearning(i){if(confirm("Delete this learning note?")){data.myLearnings.splice(i,1);if(saveData())renderLessons();}}
+function editMyLearning(i){
+  const x=data.myLearnings?.[i]; if(!x)return;
+  pendingImages.editLearnImageValue=null;
+  modal(`<h2>✏️ Edit What I Learned 🌱</h2>
+    <label>What did you learn?</label><input id="editLearnTitle" class="form-input" value="${esc(x.title||"")}" placeholder="e.g. How to make a magic ring">
+    <label>Category</label><select id="editLearnCategory" class="form-input"><option ${x.category==="Stitch"?"selected":""}>Stitch</option><option ${x.category==="Technique"?"selected":""}>Technique</option><option ${x.category==="Pattern Reading"?"selected":""}>Pattern Reading</option><option ${x.category==="Yarn & Hook"?"selected":""}>Yarn & Hook</option><option ${x.category==="Tip / Discovery"?"selected":""}>Tip / Discovery</option><option ${x.category==="Other"?"selected":""}>Other</option></select>
+    <label>Status</label><select id="editLearnStatus" class="form-input"><option ${x.status==="Learned"?"selected":""}>Learned</option><option ${x.status==="Practicing"?"selected":""}>Practicing</option><option ${x.status==="Need to Practice"?"selected":""}>Need to Practice</option></select>
+    <label>Notes</label><textarea id="editLearnNotes" class="form-textarea" placeholder="Write what you learned, steps, tips, or reminders...">${esc(x.notes||"")}</textarea>
+    <label>Attach link</label><input id="editLearnLink" type="url" class="form-input" value="${esc(x.link||"")}" placeholder="https://youtube.com/... or another reference link">
+    <label>Optional photo / screenshot</label><input id="editLearnImage" type="file" accept="image/*" class="form-input" onchange="addImage(this,'editLearnImageValue')"><input id="editLearnImageValue" type="hidden" value="${esc(x.image||"")}">
+    ${x.image?`<img id="editLearnImageValuePreview" class="photo-preview" src="${esc(x.image)}" alt="Current learning image">`:`<img id="editLearnImageValuePreview" class="photo-preview" style="display:none">`}
+    <div class="form-actions"><button class="mini-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" onclick="saveMyLearningEdit(${i})">Save Changes ✓</button></div>`);
+}
+async function saveMyLearningEdit(i){
+  const x=data.myLearnings?.[i]; if(!x)return;
+  const title=document.getElementById("editLearnTitle")?.value.trim();
+  if(!title){alert("Please enter what you learned.");return;}
+  const link=document.getElementById("editLearnLink")?.value.trim()||"";
+  if(link){try{new URL(link);}catch(e){alert("Please enter a valid link starting with http:// or https://");return;}}
+  let image=document.getElementById("editLearnImageValue")?.value||x.image||"";
+  if(pendingImages.editLearnImageValue){
+    if(!cloudUser){alert("Please sign in to save photos to cloud storage.");return;}
+    try{setSyncStatus("☁️ Uploading photo…","saving");image=await uploadImageFile(pendingImages.editLearnImageValue,"learning");delete pendingImages.editLearnImageValue;}catch(e){alert("The photo could not be uploaded. Please try again.");return;}
+  }
+  x.title=title;
+  x.category=document.getElementById("editLearnCategory").value;
+  x.status=document.getElementById("editLearnStatus").value;
+  x.notes=document.getElementById("editLearnNotes").value;
+  x.link=link;
+  x.image=image;
+  if(saveData()){closeModal();renderLessons();toast("Learning updated ✓");}
+}
 function renderStitches(q=""){const a=stitches.filter(s=>s.join(" ").toLowerCase().includes(q.toLowerCase()));document.getElementById("stitchList").innerHTML=a.map(s=>`<div class="item"><h3>${esc(s[0])} — ${esc(s[1])}</h3><p>${esc(s[2])}</p></div>`).join("")||'<div class="empty">No stitch found.</div>'}
 function renderCategories(){const sel=document.getElementById("categoryFilter"),old=sel.value||"All";sel.innerHTML='<option value="All">All Categories</option>'+data.categories.map(c=>`<option>${esc(c)}</option>`).join("");sel.value=data.categories.includes(old)?old:"All"}
 function renderAll(){renderCategories();renderProjects();renderPatterns();renderYarn();renderLessons();renderStitches(document.getElementById("stitchSearch")?.value||"")}
@@ -346,30 +382,57 @@ async function createPattern(){
   const p={id:Date.now().toString(),name:document.getElementById("pName").value||"Untitled Pattern",category:document.getElementById("pCat").value,source:document.getElementById("pSource").value,difficulty:document.getElementById("pDiff").value||"Beginner",hook:document.getElementById("pHook").value,yarn:document.getElementById("pYarn").value,cover,notes:"",rounds:[]};
   data.patterns.unshift(p);save();closeModal();viewPattern(p.id)
 }
-function deletePattern(id){if(confirm("Delete this pattern and its rounds?")){data.patterns=data.patterns.filter(p=>p.id!==id);save()}}
+function deletePattern(id){
+  const p=data.patterns.find(x=>x.id===id); if(!p)return;
+  const linked=data.projects.filter(x=>x.patternId===id).length;
+  const msg=linked?`Delete “${p.name}” and its rounds? ${linked} linked project${linked>1?"s":""} will be unlinked. This cannot be undone.`:`Delete “${p.name}” and its rounds? This cannot be undone.`;
+  if(!confirm(msg))return;
+  data.projects.forEach(project=>{if(project.patternId===id)project.patternId=null;});
+  data.patterns=data.patterns.filter(x=>x.id!==id);
+  if(saveData()){renderAll();toast("Pattern deleted ✓");}
+}
 function viewPattern(id,projectId=null){const p=data.patterns.find(x=>x.id===id);if(!p)return;modal(patternEditor(p,projectId,false))}
+function toggleRoundDone(patternId,index,checked){
+  const p=data.patterns.find(x=>x.id===patternId);
+  if(!p || !p.rounds?.[index]) return;
+  p.rounds[index].done=!!checked;
+  syncLinkedProjectProgress(p);
+  if(saveData()){
+    setTimeout(()=>viewPattern(patternId),80);
+  }
+}
 function editPattern(id){
   editingPatternId = id;const p=data.patterns.find(x=>x.id===id);if(!p)return;modal(patternEditor(p,null,true))}
 function patternEditor(p,projectId=null,editMode=true){
  const rounds=p.rounds||[], last=getLastRound(p);
  const linked=data.projects.filter(x=>x.patternId===p.id);
- const roundContent=rounds.map((r,i)=>roundHTML(r,i,last,editMode)).join("");
+ const roundContent=rounds.map((r,i)=>roundHTML(r,i,last,editMode,p.id)).join("");
  return `<span class="pill">${esc(p.category)}</span><h2>${esc(p.name)}</h2>
  <div class="meta">${esc(p.difficulty)} · ${esc(p.hook||"")} · ${esc(p.yarn||"")}</div>
  ${p.cover?`<img class="pattern-cover" src="${p.cover}">`:""}
+ ${editMode?`<div class="item" style="margin-top:12px"><strong>✏️ Pattern Details</strong>
+   <label>Pattern name</label><input id="editPatternName" class="form-input" value="${esc(p.name||"")}">
+   <label>Category</label><select id="editPatternCategory" class="form-input">${categoryOptions(p.category)}</select>
+   <label>Difficulty</label><input id="editPatternDifficulty" class="form-input" value="${esc(p.difficulty||"")}" placeholder="Beginner">
+   <label>Hook</label><input id="editPatternHook" class="form-input" value="${esc(p.hook||"")}" placeholder="3.0 mm">
+   <label>Yarn</label><input id="editPatternYarn" class="form-input" value="${esc(p.yarn||"")}" placeholder="Cotton yarn">
+   <label>Cover photo</label><input type="hidden" id="editPatternCover" value="${esc(p.cover||"")}"><input type="file" accept="image/*" class="form-input" onchange="addImage(this,'editPatternCover')">
+   ${p.cover?`<img id="editPatternCoverPreview" class="photo-preview" src="${esc(p.cover)}" alt="Current cover photo">`:`<img id="editPatternCoverPreview" class="photo-preview" style="display:none">`}
+   <button class="primary-btn full" onclick="savePatternDetails('${p.id}')">Save Pattern Details ✓</button>
+ </div>`:""}
  <div class="item" style="margin-top:12px">
    <strong>🎥 Tutorial</strong>
    ${editMode?`<input id="editSource" class="form-input" value="${esc(p.source||"")}" placeholder="YouTube URL"><textarea id="editNotes" class="form-textarea" placeholder="My notes...">${esc(p.notes||"")}</textarea>`:`<div class="linked-pattern">${p.source?`<a href="${esc(p.source)}" target="_blank" rel="noopener">▶ Open YouTube Tutorial</a>`:"No tutorial link saved."}</div>${p.notes?`<p style="margin-top:10px">${esc(p.notes)}</p>`:""}`}
-   ${editMode?`<button class="primary-btn full" onclick="savePatternInfo('${p.id}')">Save Info</button>`:""}
+   ${editMode?`<button class="primary-btn full" onclick="savePatternInfo('${p.id}')">Save Tutorial & Notes</button>`:""}
  </div>
  <h3 style="margin-top:18px">📝 Rounds / Steps</h3>
- <div class="meta">Check the rounds you have completed. The <strong>thick border and LAST DONE</strong> marker appear in View Pattern.</div>
+ <div class="meta">Mark completed rounds in View Pattern. The <strong>thick border and LAST DONE</strong> marker appear on the latest completed round.</div>
  <div id="rounds">${roundContent}</div>
  ${editMode?`<button class="primary-btn full" onclick="addRound('${p.id}')">＋ Add Round / Step</button>`:""}
  ${linked.length?`<div class="item linked-project-box" style="margin-top:14px"><strong>📋 Linked Projects</strong><div class="progress" style="margin-top:10px"><div class="bar" style="width:${getPatternProgress(p)}%"></div></div><div class="meta"><strong>${getPatternProgress(p)}%</strong> complete${p.rounds?.length?` · Last completed: ${getLastRound(p)>=0?`R${getLastRound(p)+1}`:"None"} of R${p.rounds.length}`:""}</div>${linked.map(x=>`<div class="linked-pattern">${esc(x.name)} · ${getPatternProgress(p)}%</div>`).join("")}</div>`:""}
  ${editMode?`<div class="form-actions"><button class="mini-btn" onclick="closeModal()">Close</button><button class="primary-btn" onclick="saveRounds('${p.id}')">Save Rounds ✓</button></div>`:`<div class="form-actions"><button class="mini-btn" onclick="closeModal()">Close</button><button class="primary-btn" onclick="editPattern('${p.id}')">✏️ Edit Pattern</button></div>`}`
 }
-function roundHTML(r,i,last,editMode){
+function roundHTML(r,i,last,editMode,pIdForRound=""){
   const image = r.image || r.img || "";
   const text = r.text || r.instructions || "";
   const done = !!r.done;
@@ -391,10 +454,6 @@ function roundHTML(r,i,last,editMode){
             ${image ? `<button type="button" class="secondary small" onclick="removeRoundImage(${i})">Remove Image</button>` : ''}
           </div>
 
-          <label class="round-complete">
-            <input type="checkbox" class="round-done" data-round="${i}" ${done ? "checked" : ""}>
-            <span>Mark Round ${i+1} as Done</span>
-          </label>
         </div>
       </div>`;
   }
@@ -402,6 +461,10 @@ function roundHTML(r,i,last,editMode){
     <div class="round-card view-round-card ${done && i===last ? "last-done" : ""}">
       <div class="round-head">
         <strong>R${i+1}</strong>
+        <label class="view-round-complete">
+          <input type="checkbox" class="round-done-view" ${done ? "checked" : ""} onchange="toggleRoundDone('${pIdForRound ?? ""}',${i},this.checked)">
+          <span>Done</span>
+        </label>
         ${done && i===last ? '<span class="last-badge">LAST DONE</span>' : ''}
       </div>
       ${text ? `<div class="round-text-display">${nl2br(esc(text))}</div>` : ''}
@@ -435,8 +498,9 @@ function previewRoundImage(input){
 function collectRoundEditor(p){
   const cards=[...document.querySelectorAll("#rounds .round-card")];
   if(!cards.length)return;
-  p.rounds=cards.map((c)=>({
-    done:!!c.querySelector(".round-done")?.checked,
+  p.rounds=cards.map((c,i)=>({
+    // Completion is controlled in View Pattern, so preserve the existing done state while editing.
+    done:!!p.rounds?.[i]?.done,
     text:c.querySelector(".round-text")?.value||"",
     image:c.querySelector(".round-image-value")?.value||""
   }));
@@ -461,6 +525,21 @@ async function saveRounds(id){
   }
 }
 
+async function savePatternDetails(id){
+ const p=data.patterns.find(x=>x.id===id);if(!p)return;
+ p.name=document.getElementById("editPatternName").value.trim()||"Untitled Pattern";
+ p.category=document.getElementById("editPatternCategory").value;
+ p.difficulty=document.getElementById("editPatternDifficulty").value.trim()||"Beginner";
+ p.hook=document.getElementById("editPatternHook").value.trim();
+ p.yarn=document.getElementById("editPatternYarn").value.trim();
+ let cover=document.getElementById("editPatternCover").value||p.cover||"";
+ if(pendingImages.editPatternCover){
+   if(!cloudUser){alert("Please sign in to save a cover photo to cloud storage.");return;}
+   try{setSyncStatus("☁️ Uploading cover photo…","saving");cover=await uploadImageFile(pendingImages.editPatternCover,"pattern-cover");delete pendingImages.editPatternCover;}catch(e){alert("The cover photo could not be uploaded. Please try again.");return;}
+ }
+ p.cover=cover;
+ if(saveData()){toast("Pattern details saved ✓");setTimeout(()=>viewPattern(id),150);}
+}
 function savePatternInfo(id){const p=data.patterns.find(x=>x.id===id);p.source=document.getElementById("editSource").value;p.notes=document.getElementById("editNotes").value;save();viewPattern(id)}
 document.getElementById("categoryFilter").addEventListener("change",renderPatterns);
 document.getElementById("stitchSearch").addEventListener("input",e=>renderStitches(e.target.value));
