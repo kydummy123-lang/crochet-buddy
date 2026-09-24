@@ -468,9 +468,44 @@ function roundHTML(r,i,last,editMode,pIdForRound=""){
         ${done && i===last ? '<span class="last-badge">LAST DONE</span>' : ''}
       </div>
       ${text ? `<div class="round-text-display">${nl2br(esc(text))}</div>` : ''}
-      ${image ? `<img class="round-image-preview" src="${image}" alt="Round ${i+1} image">` : ''}
+      ${image ? `<img class="round-image-preview" src="${image}" alt="Round ${i+1} image" title="Tap to enlarge" onclick="openRoundImageViewer(this.src,this.alt)">` : ''}
     </div>`;
 }
+
+function openRoundImageViewer(src, alt="Tutorial image") {
+  if(!src) return;
+  const existing=document.getElementById("roundImageViewer");
+  if(existing) existing.remove();
+
+  const overlay=document.createElement("div");
+  overlay.id="roundImageViewer";
+  overlay.setAttribute("role","dialog");
+  overlay.setAttribute("aria-label","Enlarged tutorial image");
+  overlay.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(40,30,28,.92);display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;cursor:zoom-out;";
+
+  const img=document.createElement("img");
+  img.src=src;
+  img.alt=alt;
+  img.style.cssText="max-width:100%;max-height:92vh;width:auto;height:auto;object-fit:contain;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.35);cursor:default;background:#fff;";
+
+  const close=document.createElement("button");
+  close.type="button";
+  close.textContent="✕";
+  close.setAttribute("aria-label","Close image");
+  close.style.cssText="position:absolute;top:14px;right:14px;width:46px;height:46px;border:0;border-radius:50%;background:#fff;color:#5e4b47;font-size:25px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);";
+
+  const closeViewer=()=>overlay.remove();
+  close.onclick=closeViewer;
+  overlay.onclick=(e)=>{if(e.target===overlay) closeViewer();};
+  document.addEventListener("keydown",function onKey(e){
+    if(e.key==="Escape"){closeViewer();document.removeEventListener("keydown",onKey);}
+  });
+
+  overlay.appendChild(img);
+  overlay.appendChild(close);
+  document.body.appendChild(overlay);
+}
+
 function addRound(id){
   const p=data.patterns.find(x=>x.id===id);
   if(!p)return;

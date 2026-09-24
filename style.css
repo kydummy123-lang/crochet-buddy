@@ -93,3 +93,77 @@ body[data-theme="dark"] .empty{background:var(--paper);color:var(--muted)}
 .profile-account-actions{display:grid;gap:8px;margin:14px 0}.account-logout-btn{background:#f3d8d4!important;color:#8e4c47!important}.account-box{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:13px;margin:12px 0}.account-box strong{color:var(--rose-dark)}
 
 .learning-link{margin-top:10px}.learning-link a{display:inline-block;text-decoration:none;font-weight:700}.learning-image{display:block;width:100%;max-width:100%;height:auto;max-height:230px;object-fit:contain;border-radius:14px;margin-top:10px;background:#faf7f5}
+
+
+/* v18.1 Pattern View polish — view mode only */
+.view-round-card{
+  padding:16px;
+  margin:12px 0;
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:18px;
+}
+.view-round-card .round-head{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:42px;
+}
+.view-round-card .round-head strong{
+  font-size:20px;
+  color:var(--rose-dark);
+  letter-spacing:.3px;
+}
+.view-round-complete{
+  margin-left:auto;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 11px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:#fff;
+  color:var(--ink);
+  font-weight:700;
+  font-size:13px;
+  cursor:pointer;
+}
+.view-round-complete .round-done-view{
+  width:22px;
+  height:22px;
+  margin:0;
+  accent-color:var(--rose-dark);
+  cursor:pointer;
+}
+.view-round-card .last-badge{
+  margin-left:0;
+  white-space:nowrap;
+}
+.view-round-card .round-text-display{
+  margin-top:13px;
+  font-size:16px;
+  line-height:1.65;
+  color:var(--ink);
+}
+.view-round-card .round-image-preview{
+  max-height:260px;
+  object-fit:contain;
+  cursor:zoom-in;
+  background:#faf7f5;
+}
+.view-round-card.last-done .view-round-complete{
+  border-color:var(--rose);
+  background:#fff4f1;
+}
+@media(max-width:520px){
+  .view-round-card .round-head{
+    flex-wrap:wrap;
+  }
+  .view-round-complete{
+    margin-left:auto;
+    padding:7px 10px;
+  }
+  .view-round-card .last-badge{
+    flex-basis:auto;
+  }
+}
