@@ -103,3 +103,12 @@ body[data-theme="dark"] .empty{background:var(--paper);color:var(--muted)}
 .pattern-tools #patternSearch{flex:1 1 180px;min-width:160px}
 #favoritesFilterBtn{white-space:nowrap}
 @media(max-width:600px){.pattern-tools{align-items:stretch}.pattern-tools #patternSearch{flex-basis:100%}.pattern-tools .primary-btn,.pattern-tools #favoritesFilterBtn{flex:1}}
+
+
+/* v19.2 profile photo display fix */
+.top-profile-photo{width:28px!important;height:28px!important;max-width:28px!important;max-height:28px!important;object-fit:cover!important;border-radius:50%!important;display:block!important;position:static!important;float:none!important}
+.profile-avatar{width:42px!important;height:42px!important;min-width:42px!important;overflow:hidden!important;display:flex!important;align-items:center!important;justify-content:center!important;border-radius:50%!important}
+.profile-avatar .profile-picture-img,.profile-picture-img{width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:cover!important;border-radius:50%!important;display:block!important;position:static!important;float:none!important}
+.profile-hero-avatar,.profile-edit-avatar{overflow:hidden!important;position:relative!important}
+.profile-hero-avatar .profile-picture-img,.profile-edit-avatar .profile-picture-img{width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:cover!important;border-radius:50%!important}
+#home img{display:none!important}
