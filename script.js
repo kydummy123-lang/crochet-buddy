@@ -371,7 +371,38 @@ async function saveMyLearningEdit(i){
 function renderStitches(q=""){const a=stitches.filter(s=>s.join(" ").toLowerCase().includes(q.toLowerCase()));document.getElementById("stitchList").innerHTML=a.map(s=>`<div class="item"><h3>${esc(s[0])} — ${esc(s[1])}</h3><p>${esc(s[2])}</p></div>`).join("")||'<div class="empty">No stitch found.</div>'}
 function renderCategories(){const sel=document.getElementById("categoryFilter"),old=sel.value||"All";sel.innerHTML='<option value="All">All Categories</option>'+data.categories.map(c=>`<option>${esc(c)}</option>`).join("");sel.value=data.categories.includes(old)?old:"All"}
 
-function renderAll(){renderCategories();renderProjects();renderPatterns();renderYarn();renderLessons();renderStitches(document.getElementById("stitchSearch")?.value||"");}
+function updateDashboard(){
+  try{
+    const patterns=Array.isArray(data?.patterns)?data.patterns:[];
+    const projects=Array.isArray(data?.projects)?data.projects:[];
+
+    const inProgress=projects.filter(p=>{
+      const progress=Number(p?.progress)||0;
+      return progress>0 && progress<100;
+    }).length;
+
+    const completed=projects.filter(p=>{
+      const progress=Number(p?.progress)||0;
+      const status=String(p?.status||"").toLowerCase();
+      return progress>=100 || status==="completed";
+    }).length;
+
+    const favorites=patterns.filter(p=>p?.favorite===true || p?.favourite===true).length;
+
+    const setCount=(id,value)=>{
+      const el=document.getElementById(id);
+      if(el)el.textContent=String(value);
+    };
+
+    setCount("dashPatterns",patterns.length);
+    setCount("dashInProgress",inProgress);
+    setCount("dashCompleted",completed);
+    setCount("dashFavorites",favorites);
+  }catch(err){
+    console.warn("Dashboard update skipped:",err);
+  }
+}
+function renderAll(){renderCategories();renderProjects();renderPatterns();renderYarn();renderLessons();renderStitches(document.getElementById("stitchSearch")?.value||"");};updateDashboard()
 function lesson(n){const l=lessons.find(x=>x[0]===n);modal(`<span class="pill">LESSON ${l[0]}</span><h2>${l[3]} ${esc(l[1])}</h2><p>${esc(l[2])}</p><div class="card" style="padding:16px;margin-top:14px"><strong>Practice</strong><p>Grab your hook and some scrap yarn. Practice slowly and count your stitches.</p></div><div class="form-actions"><button class="primary-btn" onclick="closeModal()">Got it ✓</button></div>`)}
 function removeItem(type,i){if(confirm("Delete this item?")){data[type].splice(i,1);save()}}
 function addImage(input,targetId){
