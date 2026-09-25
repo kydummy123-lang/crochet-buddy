@@ -705,6 +705,13 @@ async function initCloud(){
   });
 }
 
+applyTheme();
+renderAll();
+removeUnexpectedHomeImages();
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+initCloud();
+
+
 /* Privacy PIN lock — 4 digits */
 const PIN_KEY="crochetBuddyPinV1";
 const DEFAULT_PIN="0705";
@@ -758,11 +765,3 @@ updateLockAccount();
 
 const profileButton=document.getElementById("profileBtn");
 if(profileButton) profileButton.addEventListener("click",openProfile);
-
-applyTheme();
-renderAll();
-removeUnexpectedHomeImages();
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
-initCloud();
-
-
