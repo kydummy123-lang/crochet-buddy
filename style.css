@@ -101,8 +101,8 @@ body[data-theme="dark"] .empty{background:var(--paper);color:var(--muted)}
 .profile-hero-avatar img,.profile-edit-avatar img{width:100%;height:100%;object-fit:cover}
 .pattern-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .pattern-tools #patternSearch{flex:1 1 180px;min-width:160px}
-#favoritesFilterBtn{white-space:nowrap}
-#FavoritesFilterBtn{
+.pattern-tools > button:first-of-type{white-space:nowrap}
+.pattern-tools > button:first-of-type{
   background:#fff4f5;
   color:#9b5b68;
   border:1px solid #e8b8c1;
@@ -114,13 +114,13 @@ body[data-theme="dark"] .empty{background:var(--paper);color:var(--muted)}
   transition:all .2s ease;
 }
 
-#FavoritesFilterBtn:hover{
+.pattern-tools > button:first-of-type:hover{
   background:#fde5e9;
   border-color:#d99aa7;
   transform:translateY(-1px);
   box-shadow:0 4px 10px rgba(155,91,104,.16);
 }
-@media(max-width:600px){.pattern-tools{align-items:stretch}.pattern-tools #patternSearch{flex-basis:100%}.pattern-tools .primary-btn,.pattern-tools #favoritesFilterBtn{flex:1}}
+@media(max-width:600px){.pattern-tools{align-items:stretch}.pattern-tools #patternSearch{flex-basis:100%}.pattern-tools .primary-btn,.pattern-tools .pattern-tools > button:first-of-type{flex:1}}
 
 
 /* v19.2 profile photo display fix */
