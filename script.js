@@ -216,53 +216,56 @@ function deleteProfile(id){if(Object.keys(profileStore.profiles).length<=1)retur
 function editCurrentProfile(){const p=profileStore.profiles[activeProfileId];pendingImages.profileImage=null;modal(`<h2>⚙️ Customize Profile</h2><div class="profile-edit-avatar">${p.avatarImage?`<img class="profile-picture-img" src="${esc(p.avatarImage)}" alt="Current profile photo">`:`<span>${esc(p.avatar||"🧶")}</span>`}</div><label>Profile name</label><input id="profileName" class="form-input" value="${esc(p.name)}"><label>Profile picture</label><input id="profileImage" type="file" accept="image/*" class="form-input" onchange="selectProfileImage(this,'profileImageValue')"><input id="profileImageValue" type="hidden" value="${esc(p.avatarImage||"")}"><small class="meta">Choose a photo from your phone or computer. It will be saved to your cloud account.</small><label>Avatar / emoji (used if no picture)</label><input id="profileAvatar" class="form-input" value="${esc(p.avatar||"🧶")}" maxlength="4"><label>Theme</label><select id="profileTheme" class="form-input">${Object.entries(THEMES).map(([k,t])=>`<option value="${k}" ${p.theme===k?"selected":""}>${t.emoji} ${t.label}</option>`).join("")}</select><div class="form-actions"><button class="mini-btn" onclick="openProfile()">Cancel</button><button class="primary-btn" onclick="saveCurrentProfile()">Save Profile ✓</button></div>`)}
 async function saveCurrentProfile(){const p=profileStore.profiles[activeProfileId];p.name=document.getElementById("profileName").value.trim()||"Crochet Journal";p.avatar=document.getElementById("profileAvatar").value.trim()||"🧶";p.theme=document.getElementById("profileTheme").value;let image=document.getElementById("profileImageValue")?.value||p.avatarImage||"";if(pendingImages.profileImage){if(!cloudUser){alert("Please sign in to save a profile picture to cloud storage.");return;}try{setSyncStatus("☁️ Uploading profile picture…","saving");image=await uploadImageFile(pendingImages.profileImage,"profile");delete pendingImages.profileImage;}catch(e){alert("The profile picture could not be uploaded. Please try again.");return;}}p.avatarImage=image;profileStore.activeId=activeProfileId;localStorage.setItem(PROFILE_KEY,JSON.stringify(profileStore));applyTheme();closeModal();await cloudSave();toast("Profile updated and synced ✓")}
 
-function renderProjects(){
- const h=data.projects.length?data.projects.map((p,i)=>{
-   const pat=data.patterns.find(x=>x.id===p.patternId);
-   const linked=pat?`<div class="linked-pattern">🧶 Pattern: <strong>${esc(pat.name)}</strong> · ${esc(pat.category)}</div>`:"";
-   const autoProgress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(p.progress)||0));
-   const roundNote=pat&&pat.rounds?.length?`<div class="project-round-note">Last completed: ${getLastRound(pat)>=0?`R${getLastRound(pat)+1}`:"None yet"} of ${pat.rounds.length}</div>`:"";
-   if(pat)p.progress=autoProgress;
-   return `<div class="item">
-    <div class="item-head"><div><h3>${esc(p.name)}</h3><div class="meta">${esc(p.status||"WIP")}</div></div><button class="danger" onclick="removeItem('projects',${i})">Delete</button></div>
+function projectProgressAndStatus(p){
+  const pat=p.patternId?data.patterns.find(x=>x.id===p.patternId):null;
+  const progress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(p.progress)||0));
+  if(pat)p.progress=progress;
+  if(pat){
+    if(progress>=100){
+      if(p.status!=="Completed") p.completedAt=p.completedAt||new Date().toISOString().slice(0,10);
+      p.status="Completed";
+    }else if(progress<=0){p.status="Not Started";p.completedAt="";}
+    else {p.status="In Progress";p.completedAt="";}
+  }
+  return {pat,progress};
+}
+function formatProjectDate(value){
+  if(!value)return "—";
+  const d=new Date(value+(/T/.test(value)?"":"T00:00:00"));
+  if(Number.isNaN(d.getTime()))return esc(value);
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+}
+function renderProjectCard(p,i,completed=false){
+  const {pat,progress}=projectProgressAndStatus(p);
+  const linked=pat?`<div class="linked-pattern">🧶 Pattern: <strong>${esc(pat.name)}</strong> · ${esc(pat.category)}</div>`:"";
+  const roundNote=pat&&pat.rounds?.length?`<div class="project-round-note">Last completed: ${getLastRound(pat)>=0?`R${getLastRound(pat)+1}`:"None yet"} of ${pat.rounds.length}</div>`:"";
+  const photo=p.photo?`<img class="project-photo" src="${esc(p.photo)}" alt="${esc(p.name)} project photo" onclick="openRoundImageViewer(this.src,this.alt)">`:"";
+  return `<div class="item project-card">
+    ${photo}
+    <div class="item-head"><div><h3>${esc(p.name)}</h3><div class="project-status ${p.status==="Completed"?"completed":p.status==="In Progress"?"in-progress":"not-started"}">${esc(p.status||"Not Started")}</div></div><button class="danger" onclick="removeItem('projects',${i})">Delete</button></div>
     ${linked}
-    <div class="progress"><div class="bar" style="width:${autoProgress}%"></div></div>
-    <div class="meta">${autoProgress}% complete${pat?' · Automatically calculated from pattern rounds':''}</div>${roundNote}
+    <div class="project-dates"><span>📅 Started: <strong>${formatProjectDate(p.startDate)}</strong></span><span>🎯 Target: <strong>${formatProjectDate(p.targetDate)}</strong></span>${completed?`<span>✅ Completed: <strong>${formatProjectDate(p.completedAt)}</strong></span>`:""}</div>
+    <div class="progress"><div class="bar" style="width:${progress}%"></div></div>
+    <div class="meta"><strong>${progress}%</strong> complete${pat?' · Automatically calculated from pattern rounds':''}</div>${roundNote}
+    ${p.notes?`<div class="project-notes">📝 ${esc(p.notes)}</div>`:""}
     <div class="pattern-actions">${pat?`<button class="mini-btn view-btn" onclick="viewPattern('${pat.id}','${p.id}')">Open Pattern</button>`:""}<button class="mini-btn edit-btn" onclick="editProject(${i})">Edit Project</button></div>
-   </div>`
- }).join(""):'<div class="empty">No projects yet. Add your first project! 🧶</div>';
- document.getElementById("projectList").innerHTML=h;
- document.getElementById("homeProjects").innerHTML=data.projects.length?data.projects.slice(0,2).map(p=>{
-   const pat=data.patterns.find(x=>x.id===p.patternId);
-   const hp=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(p.progress)||0));
-   if(pat)p.progress=hp;
-   return `<div class="item"><h3>${esc(p.name)}</h3>${pat?`<div class="meta">🧶 ${esc(pat.name)}</div>`:""}<div class="progress"><div class="bar" style="width:${hp}%"></div></div><div class="meta">${hp}% complete</div></div>`
- }).join(""):'<div class="empty">Your next creation starts here. ✨</div>'
+  </div>`;
 }
-function getLastRound(p){
- if(!p?.rounds?.length)return -1;
- let last=-1;
- p.rounds.forEach((r,i)=>{if(r.done)last=i});
- return last;
+function renderProjects(){
+  const active=[],completed=[];
+  data.projects.forEach((p,i)=>{
+    projectProgressAndStatus(p);
+    (p.status==="Completed"?completed:active).push([p,i]);
+  });
+  const activeHtml=active.length?active.map(([p,i])=>renderProjectCard(p,i,false)).join(""):'<div class="empty">No active projects yet. Add your next creation! 🧶</div>';
+  const historyHtml=completed.length?`<div class="project-history-title"><h3>✅ Completed Project History</h3><span class="meta">${completed.length} completed</span></div><div class="stack">${completed.map(([p,i])=>renderProjectCard(p,i,true)).join("")}</div>`:"";
+  document.getElementById("projectList").innerHTML=activeHtml+historyHtml;
+  document.getElementById("homeProjects").innerHTML=data.projects.length?data.projects.filter(p=>p.status!=="Completed").slice(0,2).map(p=>{
+    const {pat,progress}=projectProgressAndStatus(p);
+    return `<div class="item">${p.photo?`<img class="home-project-photo" src="${esc(p.photo)}" alt="">`:""}<h3>${esc(p.name)}</h3>${pat?`<div class="meta">🧶 ${esc(pat.name)}</div>`:""}<div class="project-status ${p.status==="In Progress"?"in-progress":"not-started"}">${esc(p.status||"Not Started")}</div><div class="progress"><div class="bar" style="width:${progress}%"></div></div><div class="meta">${progress}% complete</div></div>`
+  }).join(""):'<div class="empty">Your next creation starts here. ✨</div>';
 }
-function getPatternProgress(p){
- const rounds=p?.rounds||[];
- if(!rounds.length)return 0;
- const last=getLastRound(p);
- if(last<0)return 0;
- return Math.min(100, Math.round(((last+1)/rounds.length)*100));
-}
-function syncLinkedProjectProgress(p){
- if(!p)return;
- const progress=getPatternProgress(p);
- data.projects.forEach(project=>{if(project.patternId===p.id) project.progress=progress;});
-}
-function ensurePatternTools(){
-  const tools=document.querySelector(".pattern-tools"); if(!tools)return;
-  if(!document.getElementById("patternSearch")){const input=document.createElement("input");input.id="patternSearch";input.className="search";input.placeholder="🔎 Search patterns...";input.addEventListener("input",e=>{patternSearchTerm=e.target.value;renderPatterns();});tools.insertBefore(input,document.getElementById("addPatternBtn"));}
-  if(!document.getElementById("favoritesFilterBtn")){const b=document.createElement("button");b.id="favoritesFilterBtn";b.className="secondary";b.textContent="♡ Favorites";b.onclick=()=>{favoritesOnly=!favoritesOnly;b.textContent=favoritesOnly?"❤️ Favorites":"♡ Favorites";renderPatterns();};tools.insertBefore(b,document.getElementById("addPatternBtn"));}
-}
-function togglePatternFavorite(id){const p=data.patterns.find(x=>x.id===id);if(!p)return;p.favorite=!p.favorite;if(saveData())renderPatterns();}
+
 function renderPatterns(){
  ensurePatternTools();
  const filter=document.getElementById("categoryFilter").value||"All";
@@ -404,6 +407,19 @@ function deletePattern(id){
   if(saveData()){renderAll();toast("Pattern deleted ✓");}
 }
 function viewPattern(id,projectId=null){const p=data.patterns.find(x=>x.id===id);if(!p)return;modal(patternEditor(p,projectId,false))}
+function syncLinkedProjectProgress(pattern){
+  if(!pattern)return;
+  const progress=getPatternProgress(pattern);
+  data.projects.forEach(project=>{
+    if(project.patternId===pattern.id){
+      const wasCompleted=project.status==="Completed";
+      project.progress=progress;
+      project.status=progress>=100?"Completed":progress>0?"In Progress":"Not Started";
+      if(project.status==="Completed"&&!wasCompleted)project.completedAt=project.completedAt||new Date().toISOString().slice(0,10);
+      if(project.status!=="Completed")project.completedAt="";
+    }
+  });
+}
 function toggleRoundDone(patternId,index,checked){
   const p=data.patterns.find(x=>x.id===patternId);
   if(!p || !p.rounds?.[index]) return;
@@ -591,10 +607,44 @@ function savePatternInfo(id){const p=data.patterns.find(x=>x.id===id);p.source=d
 document.getElementById("categoryFilter").addEventListener("change",renderPatterns);
 document.getElementById("stitchSearch").addEventListener("input",e=>renderStitches(e.target.value));
 function projectPatternOptions(selected=""){return `<option value="">No pattern linked</option>`+data.patterns.map(p=>`<option value="${p.id}" ${p.id===selected?"selected":""}>${esc(p.name)} — ${esc(p.category)}</option>`).join("")}
-document.getElementById("addProjectBtn").onclick=()=>modal(`<h2>New Project 📋</h2><input id="fName" class="form-input" placeholder="Project name"><label>Link to pattern</label><select id="fPattern" class="form-input">${projectPatternOptions()}</select><div class="meta">If you link a pattern, progress is calculated automatically from the last completed round.</div><input id="fProgress" type="number" min="0" max="100" class="form-input" placeholder="Manual progress % (only for unlinked projects)"><input id="fStatus" class="form-input" placeholder="Status (WIP, Planned, Done)"><textarea id="fNotes" class="form-textarea" placeholder="Notes"></textarea><div class="form-actions"><button class="primary-btn" onclick="addProject()">Save Project</button></div>`);
-function addProject(){data.projects.unshift({name:document.getElementById("fName").value||"Untitled Project",patternId:document.getElementById("fPattern").value||null,progress:Number(document.getElementById("fProgress").value)||0,status:document.getElementById("fStatus").value||"WIP",notes:document.getElementById("fNotes").value});save();closeModal()}
-function editProject(i){const p=data.projects[i];const pat=p.patternId?data.patterns.find(x=>x.id===p.patternId):null;const progress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(p.progress)||0));modal(`<h2>Edit Project 📋</h2><input id="efName" class="form-input" value="${esc(p.name)}"><label>Linked pattern</label><select id="efPattern" class="form-input">${projectPatternOptions(p.patternId||"")}</select><div class="meta" id="efProgressNote">${pat?`Progress is automatic: ${progress}% based on the last completed round.`:"Progress is manual because no pattern is linked."}</div><input id="efProgress" type="number" min="0" max="100" class="form-input" value="${progress}" ${pat?"readonly":""}><input id="efStatus" class="form-input" value="${esc(p.status||"WIP")}"><textarea id="efNotes" class="form-textarea">${esc(p.notes||"")}</textarea><div class="form-actions"><button class="primary-btn" onclick="saveProject(${i})">Save Changes</button></div>`)}
-function saveProject(i){const p=data.projects[i];p.name=document.getElementById("efName").value||"Untitled Project";p.patternId=document.getElementById("efPattern").value||null;const pat=p.patternId?data.patterns.find(x=>x.id===p.patternId):null;p.progress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(document.getElementById("efProgress").value)||0));p.status=document.getElementById("efStatus").value||"WIP";p.notes=document.getElementById("efNotes").value;save();closeModal()}
+function projectPhotoInput(targetId,value=""){
+ return `<label>Project photo</label><input id="${targetId}File" type="file" accept="image/*" class="form-input" onchange="addImage(this,'${targetId}')"><input id="${targetId}" type="hidden" value="${esc(value||"")}"><img id="${targetId}Preview" class="project-photo-preview" src="${esc(value||"")}" style="${value?"display:block":"display:none"}" alt="Project photo preview"><small class="meta">Add a photo of your work. It will be saved to your cloud account.</small>`;
+}
+document.getElementById("addProjectBtn").onclick=()=>{pendingImages.projectImage=null;modal(`<h2>New Project 📋</h2><input id="fName" class="form-input" placeholder="Project name">${projectPhotoInput("fProjectImage")}<label>Link to pattern</label><select id="fPattern" class="form-input">${projectPatternOptions()}</select><div class="meta">If you link a pattern, progress is calculated automatically from the completed rounds.</div><label>Start date</label><input id="fStartDate" type="date" class="form-input"><label>Target / completion date</label><input id="fTargetDate" type="date" class="form-input"><label>Project status</label><select id="fStatus" class="form-input"><option>Not Started</option><option>In Progress</option><option>Completed</option></select><input id="fProgress" type="number" min="0" max="100" class="form-input" placeholder="Manual progress % (only for unlinked projects)"><textarea id="fNotes" class="form-textarea" placeholder="Project notes"></textarea><div class="form-actions"><button class="primary-btn" onclick="addProject()">Save Project</button></div>`) };
+async function addProject(){
+ const name=document.getElementById("fName").value.trim()||"Untitled Project";
+ const patternId=document.getElementById("fPattern").value||null;
+ const pat=patternId?data.patterns.find(x=>x.id===patternId):null;
+ let photo=document.getElementById("fProjectImage")?.value||"";
+ if(pendingImages.fProjectImage){
+   if(!cloudUser){alert("Please sign in to save a project photo to cloud storage.");return;}
+   try{setSyncStatus("☁️ Uploading project photo…","saving");photo=await uploadImageFile(pendingImages.fProjectImage,"project");delete pendingImages.fProjectImage;}catch(e){alert("The project photo could not be uploaded. Please try again.");return;}
+ }
+ const progress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(document.getElementById("fProgress").value)||0));
+ const status=pat?(progress>=100?"Completed":progress>0?"In Progress":"Not Started"):document.getElementById("fStatus").value||"Not Started";
+ data.projects.unshift({name,photo,patternId,progress,status,startDate:document.getElementById("fStartDate").value||"",targetDate:document.getElementById("fTargetDate").value||"",completedAt:status==="Completed"?new Date().toISOString().slice(0,10):"",notes:document.getElementById("fNotes").value});
+ if(saveData()){closeModal();renderProjects();toast("Project added ✓")}
+}
+function editProject(i){
+ const p=data.projects[i];const pat=p.patternId?data.patterns.find(x=>x.id===p.patternId):null;const progress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(p.progress)||0));pendingImages.projectImage=null;
+ modal(`<h2>Edit Project 📋</h2><input id="efName" class="form-input" value="${esc(p.name||"")}">${projectPhotoInput("efProjectImage",p.photo||"")}<label>Linked pattern</label><select id="efPattern" class="form-input">${projectPatternOptions(p.patternId||"")}</select><div class="meta" id="efProgressNote">${pat?`Progress is automatic: ${progress}% based on completed pattern rounds.`:"Progress is manual because no pattern is linked."}</div><input id="efProgress" type="number" min="0" max="100" class="form-input" value="${progress}" ${pat?"readonly":""}><label>Start date</label><input id="efStartDate" type="date" class="form-input" value="${esc(p.startDate||"")}"><label>Target / completion date</label><input id="efTargetDate" type="date" class="form-input" value="${esc(p.targetDate||"")}"><label>Project status</label><select id="efStatus" class="form-input"><option ${p.status==="Not Started"?"selected":""}>Not Started</option><option ${p.status==="In Progress"?"selected":""}>In Progress</option><option ${p.status==="Completed"?"selected":""}>Completed</option></select><textarea id="efNotes" class="form-textarea" placeholder="Project notes">${esc(p.notes||"")}</textarea><div class="form-actions"><button class="primary-btn" onclick="saveProject(${i})">Save Changes</button></div>`)
+}
+async function saveProject(i){
+ const p=data.projects[i];p.name=document.getElementById("efName").value.trim()||"Untitled Project";p.patternId=document.getElementById("efPattern").value||null;
+ const pat=p.patternId?data.patterns.find(x=>x.id===p.patternId):null;p.progress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(document.getElementById("efProgress").value)||0));
+ let status=document.getElementById("efStatus").value||"Not Started";
+ if(pat)status=p.progress>=100?"Completed":p.progress>0?"In Progress":"Not Started";
+ const wasCompleted=p.status==="Completed";p.status=status;p.startDate=document.getElementById("efStartDate").value||"";p.targetDate=document.getElementById("efTargetDate").value||"";p.notes=document.getElementById("efNotes").value;
+ let photo=document.getElementById("efProjectImage")?.value||p.photo||"";
+ if(pendingImages.efProjectImage){
+   if(!cloudUser){alert("Please sign in to save a project photo to cloud storage.");return;}
+   try{setSyncStatus("☁️ Uploading project photo…","saving");photo=await uploadImageFile(pendingImages.efProjectImage,"project");delete pendingImages.efProjectImage;}catch(e){alert("The project photo could not be uploaded. Please try again.");return;}
+ }
+ p.photo=photo;
+ if(status==="Completed"&&!wasCompleted)p.completedAt=new Date().toISOString().slice(0,10);
+ if(status!=="Completed")p.completedAt="";
+ if(saveData()){closeModal();renderProjects();toast("Project updated ✓")}
+}
 document.getElementById("addYarnBtn").onclick=()=>modal(`<h2>New Yarn 🧵</h2><label>Brand / yarn name</label><input id="yName" class="form-input" placeholder="e.g. Himalaya Dolphin Baby"><label>Color</label><input id="yColor" class="form-input" placeholder="e.g. Pink"><label>Weight</label><input id="yWeight" class="form-input" placeholder="e.g. DK, worsted"><label>Amount</label><input id="yAmount" class="form-input" placeholder="e.g. 100 g / 1 ball"><div class="form-actions"><button class="mini-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" onclick="addYarn()">Save Yarn ✓</button></div>`);
 function addYarn(){const name=document.getElementById("yName").value.trim()||"Unnamed Yarn";data.yarn.unshift({name,color:document.getElementById("yColor").value.trim(),weight:document.getElementById("yWeight").value.trim(),amount:document.getElementById("yAmount").value.trim()});if(saveData()){closeModal();renderYarn();toast("Yarn added ✓")}}
 function editYarn(i){
