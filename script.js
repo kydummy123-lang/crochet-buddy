@@ -370,7 +370,33 @@ async function saveMyLearningEdit(i){
 }
 function renderStitches(q=""){const a=stitches.filter(s=>s.join(" ").toLowerCase().includes(q.toLowerCase()));document.getElementById("stitchList").innerHTML=a.map(s=>`<div class="item"><h3>${esc(s[0])} — ${esc(s[1])}</h3><p>${esc(s[2])}</p></div>`).join("")||'<div class="empty">No stitch found.</div>'}
 function renderCategories(){const sel=document.getElementById("categoryFilter"),old=sel.value||"All";sel.innerHTML='<option value="All">All Categories</option>'+data.categories.map(c=>`<option>${esc(c)}</option>`).join("");sel.value=data.categories.includes(old)?old:"All"}
-function renderAll(){renderCategories();renderProjects();renderPatterns();renderYarn();renderLessons();renderStitches(document.getElementById("stitchSearch")?.value||"")}
+function updateDashboard(){
+  const patterns=data.patterns||[];
+  const projects=data.projects||[];
+
+  const inProgress=projects.filter(p=>{
+    const progress=Number(p.progress)||0;
+    return progress>0 && progress<100;
+  }).length;
+
+  const completed=projects.filter(p=>{
+    const progress=Number(p.progress)||0;
+    return progress>=100 || String(p.status||"").toLowerCase()==="completed";
+  }).length;
+
+  const favorites=patterns.filter(p=>p.favorite===true || p.favourite===true).length;
+
+  const elPatterns=document.getElementById("dashPatterns");
+  const elInProgress=document.getElementById("dashInProgress");
+  const elCompleted=document.getElementById("dashCompleted");
+  const elFavorites=document.getElementById("dashFavorites");
+
+  if(elPatterns)elPatterns.textContent=patterns.length;
+  if(elInProgress)elInProgress.textContent=inProgress;
+  if(elCompleted)elCompleted.textContent=completed;
+  if(elFavorites)elFavorites.textContent=favorites;
+}
+function renderAll(){renderCategories();renderProjects();renderPatterns();renderYarn();renderLessons();renderStitches(document.getElementById("stitchSearch")?.value||"")updateDashboard();}
 function lesson(n){const l=lessons.find(x=>x[0]===n);modal(`<span class="pill">LESSON ${l[0]}</span><h2>${l[3]} ${esc(l[1])}</h2><p>${esc(l[2])}</p><div class="card" style="padding:16px;margin-top:14px"><strong>Practice</strong><p>Grab your hook and some scrap yarn. Practice slowly and count your stitches.</p></div><div class="form-actions"><button class="primary-btn" onclick="closeModal()">Got it ✓</button></div>`)}
 function removeItem(type,i){if(confirm("Delete this item?")){data[type].splice(i,1);save()}}
 function addImage(input,targetId){
