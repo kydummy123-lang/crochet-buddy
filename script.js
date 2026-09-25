@@ -466,6 +466,59 @@ function printPatternPDF(id){
   w.document.close();
   w.onload=()=>setTimeout(()=>w.print(),500);
 }
+function exportPatternWord(id){
+  const p=data.patterns.find(x=>x.id===id);
+  if(!p)return;
+
+  const rounds=p.rounds||[];
+
+  const roundHTML=rounds.map((r,i)=>{
+    const text=r.text||r.instructions||"";
+    const image=r.image||r.img||"";
+
+    return `
+      <h2>Round ${i+1}</h2>
+      ${text?`<p>${nl2br(esc(text))}</p>`:""}
+      ${image?`<p><img src="${esc(image)}" style="max-width:600px;"></p>`:""}
+    `;
+  }).join("");
+
+  const html=`
+<html>
+<head>
+<meta charset="utf-8">
+<title>${esc(p.name||"Crochet Pattern")}</title>
+</head>
+<body>
+<h1>🧶 ${esc(p.name||"Untitled Pattern")}</h1>
+
+<p>
+<b>Category:</b> ${esc(p.category||"")}<br>
+<b>Difficulty:</b> ${esc(p.difficulty||"")}<br>
+<b>Hook:</b> ${esc(p.hook||"")}<br>
+<b>Yarn:</b> ${esc(p.yarn||"")}
+</p>
+
+${p.cover?`<p><img src="${esc(p.cover)}" style="max-width:650px;"></p>`:""}
+
+${roundHTML}
+
+${p.source?`<p><b>🎥 Tutorial:</b> <a href="${esc(p.source)}">${esc(p.source)}</a></p>`:""}
+
+<p><i>Created with Crochet Buddy 🧶</i></p>
+</body>
+</html>`;
+
+  const blob=new Blob([html],{type:"application/msword"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=(p.name||"Crochet-Pattern")+".doc";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 function toggleRoundDone(patternId,index,checked){
   const p=data.patterns.find(x=>x.id===patternId);
   if(!p || !p.rounds?.[index]) return;
