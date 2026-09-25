@@ -268,7 +268,7 @@ function renderPatterns(){
    </div>`
  }).join(""):'<div class="empty">No patterns in this category yet. Tap “New Pattern” to start. 🧶</div>'
 }
-function renderYarn(){document.getElementById("yarnList").innerHTML=data.yarn.length?data.yarn.map((y,i)=>`<div class="item"><div class="item-head"><div><h3>${esc(y.name)}</h3><div class="meta">${esc(y.color||"")} · ${esc(y.weight||"")} · ${esc(y.amount||"")}</div></div><button class="danger" onclick="removeItem('yarn',${i})">Delete</button></div></div>`).join(""):'<div class="empty">Your yarn stash is waiting for its first entry. 🧵</div>'}
+function renderYarn(){document.getElementById("yarnList").innerHTML=data.yarn.length?data.yarn.map((y,i)=>`<div class="item"><div class="item-head"><div><h3>${esc(y.name)}</h3><div class="meta">${esc(y.color||"")} · ${esc(y.weight||"")} · ${esc(y.amount||"")}</div></div><div class="item-actions"><button class="mini-btn edit-btn" onclick="editYarn(${i})">✏️ Edit</button><button class="danger" onclick="removeItem('yarn',${i})">Delete</button></div></div></div>`).join(""):'<div class="empty">Your yarn stash is waiting for its first entry. 🧵</div>'}
 function renderLessons(){
   const learned=new Set(data.learnedLessons||[]);
   const builtIn=lessons.map(l=>{
@@ -583,8 +583,20 @@ document.getElementById("addProjectBtn").onclick=()=>modal(`<h2>New Project 📋
 function addProject(){data.projects.unshift({name:document.getElementById("fName").value||"Untitled Project",patternId:document.getElementById("fPattern").value||null,progress:Number(document.getElementById("fProgress").value)||0,status:document.getElementById("fStatus").value||"WIP",notes:document.getElementById("fNotes").value});save();closeModal()}
 function editProject(i){const p=data.projects[i];const pat=p.patternId?data.patterns.find(x=>x.id===p.patternId):null;const progress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(p.progress)||0));modal(`<h2>Edit Project 📋</h2><input id="efName" class="form-input" value="${esc(p.name)}"><label>Linked pattern</label><select id="efPattern" class="form-input">${projectPatternOptions(p.patternId||"")}</select><div class="meta" id="efProgressNote">${pat?`Progress is automatic: ${progress}% based on the last completed round.`:"Progress is manual because no pattern is linked."}</div><input id="efProgress" type="number" min="0" max="100" class="form-input" value="${progress}" ${pat?"readonly":""}><input id="efStatus" class="form-input" value="${esc(p.status||"WIP")}"><textarea id="efNotes" class="form-textarea">${esc(p.notes||"")}</textarea><div class="form-actions"><button class="primary-btn" onclick="saveProject(${i})">Save Changes</button></div>`)}
 function saveProject(i){const p=data.projects[i];p.name=document.getElementById("efName").value||"Untitled Project";p.patternId=document.getElementById("efPattern").value||null;const pat=p.patternId?data.patterns.find(x=>x.id===p.patternId):null;p.progress=pat?getPatternProgress(pat):Math.min(100,Math.max(0,Number(document.getElementById("efProgress").value)||0));p.status=document.getElementById("efStatus").value||"WIP";p.notes=document.getElementById("efNotes").value;save();closeModal()}
-document.getElementById("addYarnBtn").onclick=()=>modal(`<h2>New Yarn 🧵</h2><input id="yName" class="form-input" placeholder="Brand / yarn name"><input id="yColor" class="form-input" placeholder="Color"><input id="yWeight" class="form-input" placeholder="Weight (e.g. DK, worsted)"><input id="yAmount" class="form-input" placeholder="Amount"><div class="form-actions"><button class="primary-btn" onclick="addYarn()">Save Yarn</button></div>`);
-function addYarn(){data.yarn.unshift({name:document.getElementById("yName").value||"Unnamed Yarn",color:document.getElementById("yColor").value,weight:document.getElementById("yWeight").value,amount:document.getElementById("yAmount").value});save();closeModal()}
+document.getElementById("addYarnBtn").onclick=()=>modal(`<h2>New Yarn 🧵</h2><label>Brand / yarn name</label><input id="yName" class="form-input" placeholder="e.g. Himalaya Dolphin Baby"><label>Color</label><input id="yColor" class="form-input" placeholder="e.g. Pink"><label>Weight</label><input id="yWeight" class="form-input" placeholder="e.g. DK, worsted"><label>Amount</label><input id="yAmount" class="form-input" placeholder="e.g. 100 g / 1 ball"><div class="form-actions"><button class="mini-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" onclick="addYarn()">Save Yarn ✓</button></div>`);
+function addYarn(){const name=document.getElementById("yName").value.trim()||"Unnamed Yarn";data.yarn.unshift({name,color:document.getElementById("yColor").value.trim(),weight:document.getElementById("yWeight").value.trim(),amount:document.getElementById("yAmount").value.trim()});if(saveData()){closeModal();renderYarn();toast("Yarn added ✓")}}
+function editYarn(i){
+  const y=data.yarn?.[i];if(!y)return;
+  modal(`<h2>✏️ Edit Yarn 🧵</h2><label>Brand / yarn name</label><input id="eyName" class="form-input" value="${esc(y.name||"")}" placeholder="e.g. Himalaya Dolphin Baby"><label>Color</label><input id="eyColor" class="form-input" value="${esc(y.color||"")}" placeholder="e.g. Pink"><label>Weight</label><input id="eyWeight" class="form-input" value="${esc(y.weight||"")}" placeholder="e.g. DK, worsted"><label>Amount</label><input id="eyAmount" class="form-input" value="${esc(y.amount||"")}" placeholder="e.g. 100 g / 1 ball"><div class="form-actions"><button class="mini-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" onclick="saveYarnEdit(${i})">Save Changes ✓</button></div>`);
+}
+function saveYarnEdit(i){
+  const y=data.yarn?.[i];if(!y)return;
+  y.name=document.getElementById("eyName").value.trim()||"Unnamed Yarn";
+  y.color=document.getElementById("eyColor").value.trim();
+  y.weight=document.getElementById("eyWeight").value.trim();
+  y.amount=document.getElementById("eyAmount").value.trim();
+  if(saveData()){closeModal();renderYarn();toast("Yarn updated ✓")}
+}
 document.getElementById("tipBtn").onclick=()=>{document.getElementById("tipText").textContent=tips[Math.floor(Math.random()*tips.length)];go("home")};
 
 function setupAuthUI(){
