@@ -558,6 +558,7 @@ function patternEditor(p,projectId=null,editMode=true){
  ${editMode?`<button class="primary-btn full" onclick="addRound('${p.id}')">＋ Add Round / Step</button>`:""}
  ${linked.length?`<div class="item linked-project-box" style="margin-top:14px"><strong>📋 Linked Projects</strong><div class="progress" style="margin-top:10px"><div class="bar" style="width:${getPatternProgress(p)}%"></div></div><div class="meta"><strong>${getPatternProgress(p)}%</strong> complete${p.rounds?.length?` · Last completed: ${getLastRound(p)>=0?`R${getLastRound(p)+1}`:"None"} of R${p.rounds.length}`:""}</div>${linked.map(x=>`<div class="linked-pattern">${esc(x.name)} · ${getPatternProgress(p)}%</div>`).join("")}</div>`:""}
  ${editMode?`<div class="form-actions"><button class="mini-btn" onclick="closeModal()">Close</button><button class="primary-btn" onclick="saveRounds('${p.id}')">Save Rounds ✓</button></div>`:`<div class="form-actions"><button class="mini-btn" onclick="closeModal()">Close</button><button class="primary-btn" onclick="editPattern('${p.id}')">✏️ Edit Pattern</button><button class="primary-btn" onclick="printPatternPDF('${p.id}')">📄 Save as PDF</button></div>`}`
+  <button class="primary-btn" onclick="exportPatternWord('${p.id}')">📝 Save as Word</button>
 }
 function roundHTML(r,i,last,editMode,pIdForRound=""){
   const image = r.image || r.img || "";
