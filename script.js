@@ -404,6 +404,68 @@ function deletePattern(id){
   if(saveData()){renderAll();toast("Pattern deleted ✓");}
 }
 function viewPattern(id,projectId=null){const p=data.patterns.find(x=>x.id===id);if(!p)return;modal(patternEditor(p,projectId,false))}
+function printPatternPDF(id){
+  const p=data.patterns.find(x=>x.id===id);
+  if(!p)return;
+
+  const rounds=p.rounds||[];
+  const w=window.open("","_blank");
+  if(!w){alert("Please allow pop-ups for Crochet Buddy so the pattern can be printed.");return;}
+
+  const roundHTML=rounds.map((r,i)=>{
+    const text=r.text||r.instructions||"";
+    const image=r.image||r.img||"";
+    return `
+      <section class="round">
+        <h2>Round ${i+1}</h2>
+        ${text?`<div class="instructions">${nl2br(esc(text))}</div>`:""}
+        ${image?`<img src="${esc(image)}" alt="Round ${i+1} tutorial image">`:""}
+      </section>
+    `;
+  }).join("");
+
+  w.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${esc(p.name||"Crochet Pattern")}</title>
+<style>
+  @page{size:auto;margin:16mm}
+  body{font-family:Arial,sans-serif;color:#333;line-height:1.5;max-width:850px;margin:0 auto;padding:20px}
+  h1{font-size:28px;margin-bottom:6px}
+  h2{font-size:20px;margin:0 0 10px}
+  .meta{color:#666;margin-bottom:18px}
+  .cover{display:block;max-width:100%;max-height:360px;object-fit:contain;margin:15px auto 25px;border-radius:10px}
+  .round{border-top:2px solid #ddd;padding:18px 0;break-inside:avoid}
+  .instructions{white-space:normal;margin-bottom:12px}
+  .round img{display:block;max-width:100%;max-height:500px;object-fit:contain;margin:12px auto;border-radius:8px}
+  .source{margin-top:25px;padding-top:15px;border-top:1px solid #ddd;font-size:13px}
+  a{color:#555}
+  .footer{margin-top:30px;text-align:center;font-size:12px;color:#888}
+</style>
+</head>
+<body>
+  <h1>🧶 ${esc(p.name||"Untitled Pattern")}</h1>
+  <div class="meta">
+    Category: ${esc(p.category||"")}<br>
+    Difficulty: ${esc(p.difficulty||"")}<br>
+    Hook: ${esc(p.hook||"")}<br>
+    Yarn: ${esc(p.yarn||"")}
+  </div>
+
+  ${p.cover?`<img class="cover" src="${esc(p.cover)}" alt="Pattern cover">`:""}
+
+  ${roundHTML}
+
+  ${p.source?`<div class="source">🎥 Tutorial: <a href="${esc(p.source)}">${esc(p.source)}</a></div>`:""}
+
+  <div class="footer">Created with Crochet Buddy 🧶</div>
+</body>
+</html>`);
+
+  w.document.close();
+  w.onload=()=>setTimeout(()=>w.print(),500);
+}
 function toggleRoundDone(patternId,index,checked){
   const p=data.patterns.find(x=>x.id===patternId);
   if(!p || !p.rounds?.[index]) return;
@@ -442,7 +504,7 @@ function patternEditor(p,projectId=null,editMode=true){
  <div id="rounds">${roundContent}</div>
  ${editMode?`<button class="primary-btn full" onclick="addRound('${p.id}')">＋ Add Round / Step</button>`:""}
  ${linked.length?`<div class="item linked-project-box" style="margin-top:14px"><strong>📋 Linked Projects</strong><div class="progress" style="margin-top:10px"><div class="bar" style="width:${getPatternProgress(p)}%"></div></div><div class="meta"><strong>${getPatternProgress(p)}%</strong> complete${p.rounds?.length?` · Last completed: ${getLastRound(p)>=0?`R${getLastRound(p)+1}`:"None"} of R${p.rounds.length}`:""}</div>${linked.map(x=>`<div class="linked-pattern">${esc(x.name)} · ${getPatternProgress(p)}%</div>`).join("")}</div>`:""}
- ${editMode?`<div class="form-actions"><button class="mini-btn" onclick="closeModal()">Close</button><button class="primary-btn" onclick="saveRounds('${p.id}')">Save Rounds ✓</button></div>`:`<div class="form-actions"><button class="mini-btn" onclick="closeModal()">Close</button><button class="primary-btn" onclick="editPattern('${p.id}')">✏️ Edit Pattern</button></div>`}`
+ ${editMode?`<div class="form-actions"><button class="mini-btn" onclick="closeModal()">Close</button><button class="primary-btn" onclick="saveRounds('${p.id}')">Save Rounds ✓</button></div>`:`<div class="form-actions"><button class="mini-btn" onclick="closeModal()">Close</button><button class="primary-btn" onclick="editPattern('${p.id}')">✏️ Edit Pattern</button><button class="primary-btn" onclick="printPatternPDF('${p.id}')">📄 Save as PDF</button></div>`}`
 }
 function roundHTML(r,i,last,editMode,pIdForRound=""){
   const image = r.image || r.img || "";
